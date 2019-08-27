@@ -1,0 +1,103 @@
+---
+title: "storm_data"
+author: "Ritesh Raj"
+date: "27 August 2019"
+output: html_document
+---
+Reproducible Research: Week 4 Course project 
+=============================================
+By Ritesh Raj
+
+## Impact of Severe Weather Events on Public Health and Economy in the United States
+
+## Aim of the project  
+The aim is to analyze the impact of different weather events on public health and economy based on the storm database collected from the U.S. National Oceanic and Atmospheric Administration's (NOAA) from year 1950 to 2011.
+
+### Loading necessary Libraries
+```{r, echo=TRUE}
+
+library(R.utils)
+library(ggplot2)
+library(plyr)
+require(gridExtra)
+```
+
+## ReadingData
+```{r,echo=TRUE}
+setwd("D:/R Directory/R directory")
+stormData <- read.csv("D:/SQL ,C# Programs/Coursera DataSets/repdata_data_StormData.csv")
+
+dim(stormData)
+head(stormData, n = 2)
+```
+```{r, echo=TRUE}
+if (dim(stormData)[2] == 37) {
+    stormData$year <- as.numeric(format(as.Date(stormData$BGN_DATE, format = "%m/%d/%Y %H:%M:%S"), "%Y"))
+}
+hist(stormData$year, breaks = 30)
+```
+we can see from the Histogram that events increase after 1995. So Taking values >= 1995 for good records
+```{r}
+storm <- stormData[stormData$year >= 1995, ]
+dim(storm)
+```
+##Impact on Public Health
+we check the number of **fatalities** and **injuries** that are caused by the bad weather conditions. We would like to get the first 15 most severe types of weather events.
+```{r}
+sortHelper <- function(fieldName, top = 15, dataset = stormData) {
+    index <- which(colnames(dataset) == fieldName)
+    field <- aggregate(dataset[, index], by = list(dataset$EVTYPE), FUN = "sum")
+    names(field) <- c("EVTYPE", fieldName)
+    field <- arrange(field, field[, 2], decreasing = T)
+    field <- head(field, n = top)
+    field <- within(field, EVTYPE <- factor(x = EVTYPE, levels = field$EVTYPE))
+    return(field)
+}
+fatalities <- sortHelper("FATALITIES", dataset = storm)
+injuries <- sortHelper("INJURIES", dataset = storm)
+```
+## Impact on Economy
+We will convert the **property damage** and **crop damage** data into comparable numerical forms according to the meaning of units described in the code book  Both `PROPDMGEXP` and `CROPDMGEXP` columns record a multiplier for each observation where we have Hundred (H), Thousand (K), Million (M) and Billion (B). Assigning the multiplier.
+
+```{r}
+convertHelper <- function(dataset = storm, fieldName, newFieldName) {
+    totalLen <- dim(dataset)[2]
+    index <- which(colnames(dataset) == fieldName)
+    dataset[, index] <- as.character(dataset[, index])
+    logic <- !is.na(toupper(dataset[, index]))
+    dataset[logic & toupper(dataset[, index]) == "B", index] <- "9"
+    dataset[logic & toupper(dataset[, index]) == "M", index] <- "6"
+    dataset[logic & toupper(dataset[, index]) == "K", index] <- "3"
+    dataset[logic & toupper(dataset[, index]) == "H", index] <- "2"
+    dataset[logic & toupper(dataset[, index]) == "", index] <- "0"
+    dataset[, index] <- as.numeric(dataset[, index])
+    dataset[is.na(dataset[, index]), index] <- 0
+    dataset <- cbind(dataset, dataset[, index - 1] * 10^dataset[, index])
+    names(dataset)[totalLen + 1] <- newFieldName
+    return(dataset)
+}
+storm <- convertHelper(storm, "PROPDMGEXP", "propertyDamage")
+storm <- convertHelper(storm, "CROPDMGEXP", "cropDamage")
+names(storm)
+options(scipen=999)
+property <- sortHelper("propertyDamage", dataset = storm)
+crop <- sortHelper("cropDamage", dataset = storm)
+```
+## REsults
+Fatalities and injuries give the number of people badly effected in an list 
+```{r}
+fatalities
+injuries
+```
+And the following is a pair of graphs of total fatalities and total injuries affected by these severe weather events. 
+```{r,echo =TRUE}
+
+```  
+
+From previous histograms, we find that **excessive heat** and **tornado** caused most fatalities;and  **tornato** caused most injuries in the United States from 1995 to 2011.
+
+As for the impact on economy, we have got two sorted lists below by the amount of money cost by damages.  
+```{r}
+property
+crop
+```
